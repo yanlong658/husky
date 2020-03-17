@@ -286,6 +286,7 @@ void process()
                 //</lio_path>
 
                 path_pub.publish(goal_path);
+                    //lio_path 跟 imu to body
                 lio_pub_path.publish(lio_path);
 
 
@@ -379,6 +380,7 @@ int main(int argc, char **argv)
     pub_cmd = nh.advertise<geometry_msgs::Twist> ("/cmd_vel", 100);
 
     //lio的路徑
+    //future_path 是現在位置
     lio_pub_path = nh.advertise<nav_msgs::Path> ("/future_path", 20);
 
     //init setting

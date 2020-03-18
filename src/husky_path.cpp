@@ -8,7 +8,7 @@
 
 //declare global variable
 ros::Publisher pub_cmd , path_pub ,lio_pub_path;
-std::string Path_Topic, POS_topic;
+std::string  POS_topic;
 double freq;
 
 //control
@@ -22,8 +22,8 @@ nav_msgs::Path goal_path;
 geometry_msgs::Point vel;
 geometry_msgs::Point acc;
 
-//goal_pose 以world為座標
-//lio_pose 以body frame為座標
+//goal_pose world為座標
+//lio_pose world為座標
 ncrl_tf::Trans goal_pose, world2body, lio_pose;
 tf::Transform world;
 
@@ -44,7 +44,7 @@ bool readParameter(ros::NodeHandle &nh)
 {
     bool result = true;
     // get topic name
-    if (!nh.getParam("Path_topic", Path_Topic) || !nh.getParam("POS_topic", POS_topic)){
+    if (  !nh.getParam("POS_topic", POS_topic)){
         ROS_ERROR("Failed to get param 'Path_topic'");
         ROS_ERROR("Failed to get param 'POS_topic'");
         result = false;
@@ -170,38 +170,44 @@ void process()
             double sample=0.02;
             qptrajectory plan;
             path_def path;
-            trajectory_profile p1,p2,p3,p4,p5;
+            trajectory_profile p1,p2,p3,p4,p5,p6;
 
             std::vector<trajectory_profile> data;
-            p1.pos << 0,0,0;
+            p1.pos << 0.0,0,0;
             p1.vel << 0.0,0.0,0;
             p1.acc << 0.00,-0.0,0;
             p1.yaw = 0;
 
-            p2.pos<< 0.6,-0.6,0;
+            p2.pos<< 6.0,0.0,0;
             p2.vel<< 0,0,0;
             p2.acc<< 0,0,0;
             p2.yaw = 0;
 
-            p3.pos<< 0,0.6,0;
+            p3.pos<< 8.0,2.0,0.0;
             p3.vel<< 0,0,0;
             p3.acc<< 0,0,0;
             p3.yaw = 0;
 
-            p4.pos << -0.6,-0.6,0;
+            p4.pos << 8.0,5.0,0;
             p4.vel << 0,0,0;
             p4.acc << 0,0,0;
             p4.yaw = 0;
 
-            p5.pos << 0,0,0;
+            p5.pos << 6.0,7.0,0;
             p5.vel << 0.0,0.0,0;
             p5.acc << 0.00,-0.0,0;
             p5.yaw = 0;
 
-            path.push_back(segments(p1,p2,2));
-            path.push_back(segments(p2,p3,2));
-            path.push_back(segments(p3,p4,2));
-            path.push_back(segments(p4,p5,2));
+            p6.pos << 0.0,7.0,0;
+            p6.vel << 0.0,0.0,0;
+            p6.acc << 0.00,-0.0,0;
+            p6.yaw = 0;
+
+            path.push_back(segments(p1,p2,8));
+            path.push_back(segments(p2,p3,4));
+            path.push_back(segments(p3,p4,4));
+            path.push_back(segments(p4,p5,4));
+            path.push_back(segments(p5,p6,8));
             data = plan.get_profile(path ,path.size(),sample);
             max = data.size();
 
@@ -225,8 +231,12 @@ void process()
                     acc.z = 0;
                     count_ =0;
 
+                    vel_cmd.linear.x = 0;
+                    vel_cmd.angular.z = 0;
+
                     std::cout<<"break---------------------------"<<std::endl;
-                    //???
+		    //讓車子停在定點
+                    pub_cmd.publish(vel_cmd);
                     flag = 1;
                     break;
                 }
@@ -240,23 +250,24 @@ void process()
                 current_time = ros::Time::now();
 
                 goal_path.header.stamp=current_time;
-                goal_path.header.frame_id="world";
+                goal_path.header.frame_id="WORLD";
 
                 geometry_msgs::PoseStamped this_pose_stamped;
 
                 this_pose_stamped.header.stamp=current_time;
-                this_pose_stamped.header.frame_id="world";
+                this_pose_stamped.header.frame_id="WORLD";
 
                 this_pose_stamped.pose.position.x = data[count_].pos[0];
                 this_pose_stamped.pose.position.y = data[count_].pos[1];
 
                 goal_path.poses.push_back(this_pose_stamped);
-
+		
+		//將lio的world frame轉到車子的body frame
                 world2body.v = world2body.q.inverse()* lio_pose.v + world2body.v;
                 world2body.q = world2body.q * lio_pose.q;
 
                 ncrl_tf::setTfTrans(world , world2body.q ,world2body.v);
-                br.sendTransform(tf::StampedTransform(world, current_time ,"world","now"));
+                br.sendTransform(tf::StampedTransform(world, current_time ,"WORLD","now"));
 
                 goal_pose.v << data[count_].pos[0] ,data[count_].pos[1] , data[count_].pos[2];
 
@@ -271,12 +282,12 @@ void process()
 
                 //<lio_path>
                 lio_path.header.stamp=current_time;
-                lio_path.header.frame_id="world";
+                lio_path.header.frame_id="WORLD";
 
                 geometry_msgs::PoseStamped lio_pose_stamped;
 
                 lio_pose_stamped.header.stamp=current_time;
-                lio_pose_stamped.header.frame_id="world";
+                lio_pose_stamped.header.frame_id="WORLD";
 
                 lio_pose_stamped.pose.position.x = world2body.v(0);
                 lio_pose_stamped.pose.position.y = world2body.v(1);
@@ -286,7 +297,6 @@ void process()
                 //</lio_path>
 
                 path_pub.publish(goal_path);
-                    //lio_path 跟 imu to body
                 lio_pub_path.publish(lio_path);
 
 
@@ -360,8 +370,7 @@ int main(int argc, char **argv)
         std::cout << "Trajectory generator"<<std::endl;
 
         std::cout << "\nHUSKY_PATH NODE : " <<
-                     "\nPOS FEEDBACK TOPIC IS " << POS_topic <<
-                     "\nMOTION PLANNING TOPIC IS " << Path_Topic <<  std::endl;
+                     "\nPOS FEEDBACK TOPIC IS " << POS_topic <<  std::endl;
 
         std::cout << "\nPID CONTROL  : " <<
                      "\nX AXIS KP " << pid_x.KP << " KI " << pid_x.KI << " KD " << pid_x.KD <<
@@ -380,7 +389,6 @@ int main(int argc, char **argv)
     pub_cmd = nh.advertise<geometry_msgs::Twist> ("/cmd_vel", 100);
 
     //lio的路徑
-    //future_path 是現在位置
     lio_pub_path = nh.advertise<nav_msgs::Path> ("/future_path", 20);
 
     //init setting

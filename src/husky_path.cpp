@@ -108,7 +108,10 @@ void process()
         break;
       }
     }
-
+    if(flag ==1)
+    {
+      ROS_INFO(" ===== KEYBOARD CONTROL ===== ");
+    }
     else if (flag == 2 )
     {
       ROS_INFO(" ===== enter ===== ");

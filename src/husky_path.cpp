@@ -127,6 +127,10 @@ void process()
       trajectory_profile p1,p2,p3,p4,p5,p6,p7,p8;
       std::vector<trajectory_profile> data;
 
+      Eigen::Vector3d error,error_last;
+      error << 0,0,0;
+      error_last << 0,0,0;
+
       if (flag == 2)
       {
         p1.pos << 0.0,0,0;
@@ -186,7 +190,8 @@ void process()
 
       while(ros::ok())
       {
-          if(count_ >=max)
+
+          if(count_ >=max && std::sqrt(std::pow(error(0),2) + std::pow(error(1),2)) < 0.1)
           {
 
             vel_cmd.linear.x = 0;
@@ -223,9 +228,11 @@ void process()
             path_pub.publish(goal_path);
           }
 
-          Eigen::Vector3d error,error_last;
+          //Eigen::Vector3d error,error_last;
 
           error= goal_pose.v - lio_pose.v;
+
+          std::cout<<goal_pose.v.transpose()<<std::endl;
 
           float cmd_x, cmd_y;
           pid_compute(pid_x, cmd_x, error(0), error_last(0), 0.001);
@@ -241,8 +248,8 @@ void process()
           //feedforward
           vel_cmd.linear.x = cmd(0);
           vel_cmd.angular.z = cmd(1);
-          vel_cmd.linear.x += 0.5 * data[count_].vel[0];
-          vel_cmd.angular.z += 0.5 * data[count_].vel[1];
+          //vel_cmd.linear.x += 0.5 * data[count_].vel[0];
+          //vel_cmd.angular.z += 0.5 * data[count_].vel[1];
 
           if (fabs(vel_cmd.linear.x) > maxCmdX)
           {

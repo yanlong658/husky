@@ -5,6 +5,7 @@
 #include <Eigen/Geometry>
 #include <eigen3/Eigen/Dense>
 #include <thread>
+#include "std_msgs/Int32.h"
 
 //declare global variable
 ros::Publisher pub_cmd , path_pub ,lio_pub_path;
@@ -24,15 +25,20 @@ geometry_msgs::Point acc;
 
 //goal_pose world為座標
 //lio_pose world為座標
-ncrl_tf::Trans goal_pose, world2body, lio_pose;
+ncrl_tf::Trans goal_pose, lio_pose;
 tf::Transform world;
 
 
 //global variable
+int c = -1;
 int i = 0;
 int count_ = 0;
 double init_time;
 
+//recieve the state from the server
+void recieve_state(const std_msgs::Int32 data){
+    c = data.data;
+}
 
 //readparameter from launch parameter
 bool readParameter(ros::NodeHandle &nh)
@@ -93,6 +99,7 @@ void process()
   while(ros::ok())
   {
     int c = getch();
+    //std::cout << "c : " << c <<  std::endl;
     if (c != EOF)
     {
       switch(c)
@@ -104,8 +111,10 @@ void process()
           flag = 2;
         break;
         case 51:     // key 3
-          flag = 3;
+          flag = 4;
         break;
+        case 2:     // key 2
+          flag = 2;
         case 4:
           flag = 4;
         break;
@@ -114,17 +123,17 @@ void process()
 
     if(flag ==1)
     {
-      ROS_INFO(" ===== KEYBOARD CONTROL ===== ");
+      //ROS_INFO(" ===== KEYBOARD CONTROL ===== ");
     }
 
-    if (flag == 2 || flag == 3)
+    if (flag == 2 || flag == 4)
     {
       ROS_INFO(" ===== enter ===== ");
       double max;
-      double sample=0.03;
+      double sample=0.0125;
       qptrajectory plan;
       path_def path;
-      trajectory_profile p1,p2,p3,p4,p5,p6,p7,p8;
+      trajectory_profile p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12;
       std::vector<trajectory_profile> data;
 
       Eigen::Vector3d error,error_last;
@@ -138,51 +147,51 @@ void process()
         p1.acc << 0.00,-0.0,0;
         p1.yaw = 0;
 
-        p2.pos<< 3.0,0.0,0;
+        p2.pos<< 4.5,0.0,0;
         p2.vel<< 0,0,0;
         p2.acc<< 0,0,0;
         p2.yaw = 0;
 
-        p3.pos<< 4.0,-1.0,0.0;
+        p3.pos<< 5.0,0.0,0;
         p3.vel<< 0,0,0;
         p3.acc<< 0,0,0;
         p3.yaw = 0;
 
-        p4.pos << 4.0,-2.5,0;
-        p4.vel << 0,0,0;
-        p4.acc << 0,0,0;
-        p4.yaw = 0;
-
-        p5.pos << 3.0,-3.5,0;
-        p5.vel << 0.0,0.0,0;
-        p5.acc << 0.00,-0.0,0;
-        p5.yaw = 0;
-
-        p6.pos << 0.0,-3.5,0;
-        p6.vel << 0.0,0.0,0;
-        p6.acc << 0.00,-0.0,0;
-        p6.yaw = 0;
-
-        path.push_back(segments(p1,p2,4));
-        path.push_back(segments(p2,p3,2));
-        path.push_back(segments(p3,p4,2));
-        path.push_back(segments(p4,p5,2));
-        path.push_back(segments(p5,p6,4));
+        path.push_back(segments(p1,p2,5));
+        path.push_back(segments(p2,p3,3));
       }
-        else if (flag == 3)
+        else if (flag == 4)
         {
           ROS_INFO(" ===== enter ===== ");
-          p7.pos << 0.0,-3.5,0;
-          p7.vel << 0.0,0.0,0;
-          p7.acc << 0.00,-0.0,0;
+          p4.pos << 5.0,0.0,0.0;
+          p4.vel << 0.0,0.0,0;
+          p4.acc << 0.00,-0.0,0;
+          p4.yaw = -90;
+
+          p5.pos << 5.0,0.0,0.0;
+          p5.vel << 0.0,0.0,0;
+          p5.acc << 0.00,-0.0,0;
+          p5.yaw = 0;
+
+          p6.pos<< 5.0,-1.0,0;
+          p6.vel<< 0,0,0;
+          p6.acc<< 0,0,0;
+          p6.yaw = 0;
+
+          p7.pos<< 5.0,-3.0,0;
+          p7.vel<< 0,0,0;
+          p7.acc<< 0,0,0;
           p7.yaw = 0;
 
-          p8.pos<< 0.0,0.0,0;
+          p8.pos<< 0.0,-3.0,0;
           p8.vel<< 0,0,0;
           p8.acc<< 0,0,0;
-          p8.yaw = 0;;
+          p8.yaw = 0;
 
-          path.push_back(segments(p7,p8,8));
+          path.push_back(segments(p4,p5,3));
+          path.push_back(segments(p5,p6,1));
+          path.push_back(segments(p6,p7,3));
+          path.push_back(segments(p7,p8,6));
       }
 
       data = plan.get_profile(path ,path.size(),sample);
@@ -190,8 +199,8 @@ void process()
 
       while(ros::ok())
       {
-
-          if(count_ >=max && std::sqrt(std::pow(error(0),2) + std::pow(error(1),2)) < 0.1)
+//&& std::sqrt(std::pow(error(0),2) + std::pow(error(1),2)) < 0.1
+          if(count_ == max)
           {
 
             vel_cmd.linear.x = 0;
@@ -201,6 +210,7 @@ void process()
             pub_cmd.publish(vel_cmd);
             flag = 1;
             count_ = 0;
+            max = 0;
             break;
           }
 
@@ -231,8 +241,10 @@ void process()
           //Eigen::Vector3d error,error_last;
 
           error= goal_pose.v - lio_pose.v;
-
-          std::cout<<goal_pose.v.transpose()<<std::endl;
+          std::cout<<"max ; "<<max<<std::endl;
+          std::cout<<"count_ : "<<count_<<std::endl;
+          std::cout<<"sqrt : "<<std::sqrt(error(0)*error(0) + error(1)*error(1))<<std::endl;
+          std::cout<<"goal_pose : "<<goal_pose.v.transpose()<<std::endl;
 
           float cmd_x, cmd_y;
           pid_compute(pid_x, cmd_x, error(0), error_last(0), 0.001);
@@ -281,7 +293,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "husky_control");
     ros::NodeHandle nh;
-
+    ros::Subscriber  husky_command = nh.subscribe("husky/command", 20, recieve_state); //Subscribe husky command
     bool init = readParameter(nh);
 
     if(init)
@@ -307,9 +319,6 @@ int main(int argc, char **argv)
     path_pub = nh.advertise<nav_msgs::Path>("trajectory",1, true);
     pub_cmd = nh.advertise<geometry_msgs::Twist> ("/cmd_vel", 100);
 
-
-    //init setting
-    ncrl_tf::setTransFrame(lio_pose, "WORLD", "IMU");
 
     //process have no ()
     std::thread ctrl_process{process};

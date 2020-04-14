@@ -115,6 +115,7 @@ void process()
         break;
         case 2:     // key 2
           flag = 2;
+        break;
         case 4:
           flag = 4;
         break;
